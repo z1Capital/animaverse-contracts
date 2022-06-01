@@ -1,0 +1,22 @@
+# Run me by typing `mythx analyze` in the directory of the yml file! :)
+
+ci: true # make the workflow fail on high severity issues
+confirm: true #  automatic confirmation of multiple file submissions (equivalent to --yes)
+
+analyze:
+  mode: deep
+  async: true
+  create-group: true
+  group-name: "animaverse"
+  solc: 0.8.12
+  remappings:
+    - "@openzeppelin/contracts/access/Ownable.sol=node_modules/@openzeppelin/contracts/access/Ownable.sol"
+    - "@openzeppelin/contracts/utils/Strings.sol=node_modules/@openzeppelin/contracts/utils/Strings.sol"
+    - "@openzeppelin/contracts/interfaces/IERC20.sol=node_modules/@openzeppelin/contracts/interfaces/IERC20.sol"
+    - "@openzeppelin/contracts/interfaces/IERC165.sol=node_modules/@openzeppelin/contracts/interfaces/IERC165.sol"
+    - "@openzeppelin/contracts/interfaces/IERC2981.sol=node_modules/@openzeppelin/contracts/interfaces/IERC2981.sol"
+    - "@openzeppelin/contracts/token/ERC721/ERC721.sol=node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol"
+    - "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol=node_modules/@openzeppelin/contracts/utils/cryptography/MerkleProof.sol"
+  targets:
+    - contracts/NFT.sol
+    - contracts/MintGame.sol

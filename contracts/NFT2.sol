@@ -15,22 +15,22 @@ error NotEnoughETH();
 error WithdrawFailed();
 error BadRoyaltyInput();
 error InsufficientFunds();
+error AlreadyMintedRound();
 error BadMaxAddressMintInput();
 error BadRoundLastTokenInput();
 
 contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
     using Strings for uint256;
 
-    uint16 internal royalty = 1000; // base 10000, 5%
-    uint16 internal commiunityRoyaltyShare = 9850; // base 10000, 98.5%
-    uint16 internal roundLastToken = 2501;
-    uint16 internal maxAddressMint = 1;
-    uint16 internal maxAddressRoundMint = 1;
-    uint16 internal _totalSupply;
-    uint16 public constant BASE = 10000;
-    uint16 public constant MAX_TOKENS = 10004;
-    uint16 public constant MAX_MINT = 1;
-    uint256 public roundMintPrice;
+    uint16 private constant BASE = 10000;
+    uint16 private constant MAX_TOKENS = 10004;
+    uint16 private royalty = 1000; // base 10000, 5%
+    uint16 private commiunityRoyaltyShare = 9850; // base 10000, 98.5%
+    uint16 private roundLastToken = 2501;
+    uint16 private maxAddressMint = 1;
+    uint16 private maxAddressRoundMint = 1;
+    uint16 private _totalSupply;
+    uint256 private roundMintPrice;
 
     string private baseURI;
     string private contractMetadata;
@@ -52,6 +52,10 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
 
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
+    }
+
+    function mintPrice() public view returns (uint256) {
+        return roundMintPrice;
     }
 
     function contractURI() public view returns (string memory) {
@@ -87,7 +91,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         if (newSupply > roundLastToken) revert NoTokensLeft();
         if (newAddressMintedCount > maxAddressMint) revert NoTokensLeft();
         if (quantity > maxAddressRoundMint) revert NoTokensLeft();
-        if (lastAddressMintRound[msgSender] == roundLastToken) revert NoTokensLeft();
+        if (lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
 
         if (roundMintPrice > 0) {
             unchecked {

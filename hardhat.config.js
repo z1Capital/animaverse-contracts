@@ -11,7 +11,7 @@ const etherscanApi = process.env.ETHSCAN_KEY ?? "";
 const infuraApi = process.env.INFURA_KEY ?? "";
 
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: "rinkeby",
   networks: {
     localhost: {
       url: "http://127.0.0.1:8545"

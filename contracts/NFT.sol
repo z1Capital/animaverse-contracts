@@ -14,11 +14,10 @@ contract AnimaVerseCollection is Ownable, ERC721, IERC2981 {
 
     uint16 internal royalty = 500; // base 10000, 5%
     uint16 public constant BASE = 10000;
+    uint16 public constant FREE_TOKENS = 5000;
     uint16 public constant MAX_TOKENS = 10000;
     uint16 public constant MAX_MINT = 3;
-    uint16 public constant MAX_WL_MINT = 3;
-    uint256 public constant MINT_PRICE = 0.3 ether;
-    uint256 public constant WL_MINT_PRICE = 0.1 ether;
+    uint256 public constant MINT_PRICE = 0.1 ether;
     uint256 public publicMintingStartBlock = type(uint256).max - 1;
     uint256 public totalSupply;
 
@@ -33,10 +32,22 @@ contract AnimaVerseCollection is Ownable, ERC721, IERC2981 {
     bytes32 public whitelistMerkleRoot;
 
     mapping(uint256 => bool) public mintedGameIds;
-    mapping(address => mapping(uint8 => uint256)) public mintedCount;
+    mapping(address => uint16) public mintedCount;
 
     modifier onlyWhitdrawable() {
         require(_msgSender() == withdrawAccount, 'AVC: Not authorzed to withdraw');
+        _;
+    }
+
+    modifier paid(uint16 quantity) {
+        uint256 totalPrice;
+        if (totalSupply >= FREE_TOKENS) {
+            totalPrice = quantity * MINT_PRICE;
+        }
+        require(msg.value >= totalPrice, 'AVC: Not enough ethers');
+        if (msg.value > totalPrice) {
+            payable(_msgSender()).transfer(msg.value - totalPrice);
+        }
         _;
     }
 
@@ -68,63 +79,49 @@ contract AnimaVerseCollection is Ownable, ERC721, IERC2981 {
         return (address(this), (_salePrice * royalty) / BASE);
     }
 
-    function whitelistMint(uint256 quantity, bytes32[] calldata proof) public payable {
+    function whitelistMint(uint16 quantity, bytes32[] calldata proof) public payable paid(quantity) {
         require(whitelistMinting, 'AVC: Whitelist Minting is not allowed');
         require(totalSupply + quantity <= MAX_TOKENS, 'AVC: That many tokens are not available');
         address msgSender = _msgSender();
 
-        uint256 accountNewMintCount = mintedCount[msgSender][0] + quantity;
-        require(accountNewMintCount <= MAX_WL_MINT, 'AVC: That many tokens are not available');
+        uint16 accountNewMintCount = mintedCount[msgSender] + quantity;
+        require(accountNewMintCount <= MAX_MINT, 'AVC: That many tokens are not available');
 
         bytes32 leaf = keccak256(abi.encodePacked(msgSender));
         require(MerkleProof.verify(proof, whitelistMerkleRoot, leaf), 'AVC: Invalid proof');
 
-        uint256 totalPrice = quantity * WL_MINT_PRICE;
-        require(msg.value >= totalPrice, 'AVC: Not enough ethers');
-        if (msg.value > totalPrice) {
-            payable(msgSender).transfer(msg.value - totalPrice);
-        }
-
-        mintedCount[msgSender][0] = accountNewMintCount;
+        mintedCount[msgSender] = accountNewMintCount;
         for (uint256 i = 0; i < quantity; i++) {
             _safeMint(msgSender, ++totalSupply);
         }
     }
 
-    function gameWinnersMint(uint256 gameId) public payable {
+    function gameWinnersMint(uint256 gameId) public payable paid(1) {
         require(gameWinnersMinting, 'AVC: Game winners minting is not allowed at this time');
         require(totalSupply < MAX_TOKENS, 'AVC: That many tokens are not available');
         address msgSender = _msgSender();
+
+        uint16 accountNewMintCount = mintedCount[msgSender] + 1;
+        require(accountNewMintCount <= MAX_MINT, 'AVC: That many tokens are not available');
 
         require(!mintedGameIds[gameId], 'AVC: Game already minted');
         address tokenIDOwner = mintGameContract.ownerOf(gameId);
         require(msgSender == tokenIDOwner, 'AVC: Not winner of game');
 
-        uint256 totalPrice = WL_MINT_PRICE;
-        require(msg.value >= totalPrice, 'AVC: Not enough ethers');
-        if (msg.value > totalPrice) {
-            payable(msgSender).transfer(msg.value - totalPrice);
-        }
-
         mintedGameIds[gameId] = true;
+        mintedCount[msgSender] = accountNewMintCount;
         _safeMint(msgSender, ++totalSupply);
     }
 
-    function mint(uint256 quantity) public payable {
+    function mint(uint16 quantity) public payable paid(quantity) {
         require(publicMintingStartBlock <= block.number, 'AVC: Minting time is not started');
         require(totalSupply + quantity <= MAX_TOKENS, 'AVC: That many tokens are not available');
         address msgSender = _msgSender();
 
-        uint256 accountNewMintCount = mintedCount[msgSender][1] + quantity;
+        uint16 accountNewMintCount = mintedCount[msgSender] + quantity;
         require(accountNewMintCount <= MAX_MINT, 'AVC: That many tokens are not available this account');
 
-        uint256 totalPrice = quantity * MINT_PRICE;
-        require(msg.value >= totalPrice, 'AVC: Not enough ethers');
-        if (msg.value > totalPrice) {
-            payable(msgSender).transfer(msg.value - totalPrice);
-        }
-
-        mintedCount[msgSender][1] = accountNewMintCount;
+        mintedCount[msgSender] = accountNewMintCount;
         for (uint256 i = 0; i < quantity; i++) {
             _safeMint(msgSender, ++totalSupply);
         }

@@ -5,10 +5,10 @@ async function main() {
   console.log('Deploying contract with the account:', deployer.address)
   console.log('Account balance:', (await deployer.getBalance()).toString())
 
-  const AnimaVerseCollection = await hre.ethers.getContractFactory('AnimaVerseCollection')
+  const AnimaVerseCollection = await hre.ethers.getContractFactory('AnimaVerseCollectionTest')
   const animaVerseCollection = await AnimaVerseCollection.deploy(
-    'ipfs://',
-    'ipfs://',
+    'https://assets.animaversedao.com/metadata',
+    'https://assets.animaversedao.com/metadata/',
   )
   const res = await animaVerseCollection.deployed()
   console.log('AnimaVerse Collection deployed to:', animaVerseCollection.address)

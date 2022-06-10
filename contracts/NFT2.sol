@@ -24,16 +24,17 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
 
     uint16 private constant BASE = 10000;
     uint16 private constant MAX_TOKENS = 10004;
-    uint16 private royalty = 1000; // base 10000, 5%
-    uint16 private commiunityRoyaltyShare = 9850; // base 10000, 98.5%
-    uint16 private roundLastToken = 2501;
-    uint16 private maxAddressMint = 1;
-    uint16 private maxAddressRoundMint = 1;
     uint16 private _totalSupply;
-    uint256 private roundMintPrice;
 
     string private baseURI;
     string private contractMetadata;
+
+    uint16 public royalty = 1000; // base 10000, 5%
+    uint16 public commiunityRoyaltyShare = 9850; // base 10000, 98.5%
+    uint16 public roundLastToken = 2501;
+    uint16 public maxAddressMint = 1;
+    uint16 public maxAddressRoundMint = 1;
+    uint256 public mintPrice;
 
     address public artistsWithdrawAccount;
     address public commiunityWithdrawAccount;
@@ -52,10 +53,6 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
 
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
-    }
-
-    function mintPrice() public view returns (uint256) {
-        return roundMintPrice;
     }
 
     function contractURI() public view returns (string memory) {
@@ -93,9 +90,9 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         if (quantity > maxAddressRoundMint) revert NoTokensLeft();
         if (lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
 
-        if (roundMintPrice > 0) {
+        if (mintPrice > 0) {
             unchecked {
-                totalPrice = quantity * roundMintPrice;
+                totalPrice = quantity * mintPrice;
             }
         }
         if (msg.value < totalPrice) {
@@ -132,7 +129,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         if (_roundLastToken < roundLastToken) revert BadRoundLastTokenInput();
         if (_maxAddressMint < maxAddressMint) revert BadMaxAddressMintInput();
 
-        roundMintPrice = price;
+        mintPrice = price;
         roundLastToken = _roundLastToken;
         maxAddressMint = _maxAddressMint;
         maxAddressRoundMint = _maxAddressRoundMint;

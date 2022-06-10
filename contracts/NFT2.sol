@@ -8,8 +8,15 @@ import '@openzeppelin/contracts/interfaces/IERC165.sol';
 import '@openzeppelin/contracts/interfaces/IERC2981.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 
+error NotExists();
+error AlreadySet();
 error NoTokensLeft();
 error NotEnoughETH();
+error WithdrawFailed();
+error BadRoyaltyInput();
+error InsufficientFunds();
+error BadMaxAddressMintInput();
+error BadRoundLastTokenInput();
 
 contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
     using Strings for uint256;
@@ -52,7 +59,9 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_exists(tokenId), 'AVC: URI query for nonexistent token');
+        if (!_exists(tokenId)) {
+            revert NotExists();
+        }
         return string(abi.encodePacked(baseURI, tokenId.toString()));
     }
 
@@ -94,8 +103,9 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         lastAddressMintRound[msgSender] = roundLastToken;
         mintedCount[msgSender] = newAddressMintedCount;
         while (_totalSupply < newSupply) {
+            _safeMint(msgSender, _totalSupply);
             unchecked {
-                _safeMint(msgSender, ++_totalSupply);
+                ++_totalSupply;
             }
         }
     }
@@ -108,41 +118,55 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         baseURI = collectionURI;
     }
 
-    function setRoundAvailableTokens(uint16 _roundLastToken, uint256 price) public onlyOwner {
-        require(_roundLastToken <= MAX_TOKENS, 'AVC: ');
-        require(_roundLastToken > roundLastToken, 'AVC: ');
-        require(price != roundMintPrice, 'AVC: ');
+    function setRoundAvailableTokens(
+        uint16 _maxAddressMint,
+        uint16 _maxAddressRoundMint,
+        uint16 _roundLastToken,
+        uint256 price
+    ) public onlyOwner {
+        if (_roundLastToken > MAX_TOKENS) revert BadRoundLastTokenInput();
+        if (_roundLastToken < roundLastToken) revert BadRoundLastTokenInput();
+        if (_maxAddressMint < maxAddressMint) revert BadMaxAddressMintInput();
 
-        roundLastToken = _roundLastToken;
         roundMintPrice = price;
+        roundLastToken = _roundLastToken;
+        maxAddressMint = _maxAddressMint;
+        maxAddressRoundMint = _maxAddressRoundMint;
     }
 
     function setRoyalty(uint16 _royalty) public onlyOwner {
-        require(_royalty >= 0 && _royalty <= 1000, 'AVC: Royalty must be between 0% and 10%');
+        if (_royalty > 1000) {
+            revert BadRoyaltyInput();
+        }
         royalty = _royalty;
     }
 
     function setCommiunityRoyaltyShare(uint16 _commiunityRoyaltyShare) public onlyOwner {
-        require(
-            _commiunityRoyaltyShare >= 0 && _commiunityRoyaltyShare <= 10000,
-            'AVC: Royalty must be between 0% and 10%'
-        );
+        if (_commiunityRoyaltyShare > 1000) {
+            revert BadRoyaltyInput();
+        }
         commiunityRoyaltyShare = _commiunityRoyaltyShare;
     }
 
     function setCommiunityWithdrawMainAccount(address account) public onlyOwner {
-        require(commiunityWithdrawAccount != account, 'AVC: Already set');
+        if (commiunityWithdrawAccount == account) {
+            revert AlreadySet();
+        }
         commiunityWithdrawAccount = account;
     }
 
     function setArtistsWithdrawAccount(address account) public onlyOwner {
-        require(artistsWithdrawAccount != account, 'AVC: Already set');
+        if (artistsWithdrawAccount == account) {
+            revert AlreadySet();
+        }
         artistsWithdrawAccount = account;
     }
 
     function withdraw(uint256 _amount) public onlyOwner {
         uint256 balance = address(this).balance;
-        require(_amount <= balance, 'AVC: Insufficient funds');
+        if (_amount > balance) {
+            revert InsufficientFunds();
+        }
 
         uint256 cShare;
         uint256 aShare;
@@ -151,13 +175,17 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
             aShare = _amount - cShare;
         }
 
-        bool successMainWithdraw;
-        (successMainWithdraw, ) = payable(commiunityWithdrawAccount).call{value: cShare}('');
-        require(successMainWithdraw, 'AVC: Withdraw failed');
+        bool commiunityWithdrawResult;
+        (commiunityWithdrawResult, ) = payable(commiunityWithdrawAccount).call{value: cShare}('');
+        if (!commiunityWithdrawResult) {
+            revert WithdrawFailed();
+        }
 
-        bool successnWithdraw;
-        (successnWithdraw, ) = payable(artistsWithdrawAccount).call{value: aShare}('');
-        require(successnWithdraw, 'AVC: Withdraw failed');
+        bool artistsWithdrawResult;
+        (artistsWithdrawResult, ) = payable(artistsWithdrawAccount).call{value: aShare}('');
+        if (!artistsWithdrawResult) {
+            revert WithdrawFailed();
+        }
 
         emit ContractWithdraw(commiunityWithdrawAccount, cShare);
         emit ContractWithdraw(artistsWithdrawAccount, aShare);
@@ -166,7 +194,9 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
     function withdrawTokens(address _tokenContract, uint256 _amount) public onlyOwner {
         IERC20 tokenContract = IERC20(_tokenContract);
         uint256 balance = tokenContract.balanceOf(address(this));
-        require(balance >= _amount, 'AVC: Not enough balance');
+        if (_amount > balance) {
+            revert InsufficientFunds();
+        }
 
         uint256 cShare;
         uint256 aShare;

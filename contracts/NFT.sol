@@ -30,14 +30,14 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
     string private contractMetadata;
 
     uint16 public royalty = 1000; // base 10000, 5%
-    uint16 public commiunityRoyaltyShare = 9850; // base 10000, 98.5%
+    uint16 public communityRoyaltyShare = 9850; // base 10000, 98.5%
     uint16 public roundLastToken = 2501;
     uint16 public maxAddressMint = 1;
     uint16 public maxAddressRoundMint = 1;
     uint256 public mintPrice;
 
     address public artistsWithdrawAccount;
-    address public commiunityWithdrawAccount;
+    address public communityWithdrawAccount;
 
     mapping(address => uint16) public lastAddressMintRound;
     mapping(address => uint16) public mintedCount;
@@ -115,10 +115,6 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         contractMetadata = _contractMetadata;
     }
 
-    function setBaseURI(string memory collectionURI) public onlyOwner {
-        baseURI = collectionURI;
-    }
-
     function setNewRound(
         uint256 _price,
         uint16 _roundLastToken,
@@ -135,6 +131,10 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         maxAddressRoundMint = _maxAddressRoundMint;
     }
 
+    function setBaseURI(string memory collectionURI) public onlyOwner {
+        baseURI = collectionURI;
+    }
+
     function setRoyalty(uint16 _royalty) public onlyOwner {
         if (_royalty > 1000) {
             revert BadRoyaltyInput();
@@ -142,18 +142,18 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         royalty = _royalty;
     }
 
-    function setCommiunityRoyaltyShare(uint16 _commiunityRoyaltyShare) public onlyOwner {
-        if (_commiunityRoyaltyShare > 1000) {
+    function setCommunityRoyaltyShare(uint16 _communityRoyaltyShare) public onlyOwner {
+        if (_communityRoyaltyShare > 1000) {
             revert BadRoyaltyInput();
         }
-        commiunityRoyaltyShare = _commiunityRoyaltyShare;
+        communityRoyaltyShare = _communityRoyaltyShare;
     }
 
-    function setCommiunityWithdrawMainAccount(address account) public onlyOwner {
-        if (commiunityWithdrawAccount == account) {
+    function setCommunityWithdrawMainAccount(address account) public onlyOwner {
+        if (communityWithdrawAccount == account) {
             revert AlreadySet();
         }
-        commiunityWithdrawAccount = account;
+        communityWithdrawAccount = account;
     }
 
     function setArtistsWithdrawAccount(address account) public onlyOwner {
@@ -172,13 +172,13 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         uint256 cShare;
         uint256 aShare;
         unchecked {
-            cShare = (_amount * commiunityRoyaltyShare) / BASE;
+            cShare = (_amount * communityRoyaltyShare) / BASE;
             aShare = _amount - cShare;
         }
 
-        bool commiunityWithdrawResult;
-        (commiunityWithdrawResult, ) = payable(commiunityWithdrawAccount).call{value: cShare}('');
-        if (!commiunityWithdrawResult) {
+        bool communityWithdrawResult;
+        (communityWithdrawResult, ) = payable(communityWithdrawAccount).call{value: cShare}('');
+        if (!communityWithdrawResult) {
             revert WithdrawFailed();
         }
 
@@ -188,7 +188,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
             revert WithdrawFailed();
         }
 
-        emit ContractWithdraw(commiunityWithdrawAccount, cShare);
+        emit ContractWithdraw(communityWithdrawAccount, cShare);
         emit ContractWithdraw(artistsWithdrawAccount, aShare);
     }
 
@@ -202,14 +202,14 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         uint256 cShare;
         uint256 aShare;
         unchecked {
-            cShare = (_amount * commiunityRoyaltyShare) / BASE;
+            cShare = (_amount * communityRoyaltyShare) / BASE;
             aShare = _amount - cShare;
         }
 
-        tokenContract.transfer(commiunityWithdrawAccount, cShare);
+        tokenContract.transfer(communityWithdrawAccount, cShare);
         tokenContract.transfer(artistsWithdrawAccount, aShare);
 
-        emit ContractWithdrawToken(commiunityWithdrawAccount, _tokenContract, cShare);
+        emit ContractWithdrawToken(communityWithdrawAccount, _tokenContract, cShare);
         emit ContractWithdrawToken(artistsWithdrawAccount, _tokenContract, aShare);
     }
 

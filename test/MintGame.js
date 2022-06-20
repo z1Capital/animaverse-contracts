@@ -24,7 +24,7 @@ describe('Mint Game contract', function () {
     ;[owner, addr1, addr2, ...addrs] = await ethers.getSigners()
 
     const AnimaVerseMintGame = await ethers.getContractFactory('AnimaVerseMintGame')
-    AnimaVerseMintGameInstance = await AnimaVerseMintGame.deploy()
+    AnimaVerseMintGameInstance = await AnimaVerseMintGame.deploy('')
     await AnimaVerseMintGameInstance.setGamesRoot(merkleTree.getRoot())
   })
 

@@ -119,17 +119,17 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         baseURI = collectionURI;
     }
 
-    function setRoundAvailableTokens(
-        uint16 _maxAddressMint,
-        uint16 _maxAddressRoundMint,
+    function setNewRound(
+        uint256 _price,
         uint16 _roundLastToken,
-        uint256 price
+        uint16 _maxAddressMint,
+        uint16 _maxAddressRoundMint
     ) public onlyOwner {
         if (_roundLastToken > MAX_TOKENS) revert BadRoundLastTokenInput();
         if (_roundLastToken < roundLastToken) revert BadRoundLastTokenInput();
         if (_maxAddressMint < maxAddressMint) revert BadMaxAddressMintInput();
 
-        mintPrice = price;
+        mintPrice = _price;
         roundLastToken = _roundLastToken;
         maxAddressMint = _maxAddressMint;
         maxAddressRoundMint = _maxAddressRoundMint;

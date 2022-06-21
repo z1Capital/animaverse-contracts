@@ -21,10 +21,8 @@ describe('NFT contract', function () {
     })
   })
 
-  // withdraw
-  // withdraw token
+  // complex batches
   // change withdraw share
-  // change withdraw addresses
   describe('NFT Mint', function () {
     it('Mint', async function () {
       const mintCount = await AnimaVerseCollectionInstance.maxAddressRoundMint()
@@ -73,6 +71,7 @@ describe('NFT contract', function () {
     })
 
     it('withdraw', async function () {
+      const basis = BigNumber.from(10000)
       const minter = addrs[0]
       const price = BigNumber.from('10').pow(16)
       const count = 1
@@ -92,11 +91,34 @@ describe('NFT contract', function () {
       const endBalanceAddr1 = await AnimaVerseCollectionInstance.provider.getBalance(addr1.address)
       const endBalanceAddr2 = await AnimaVerseCollectionInstance.provider.getBalance(addr2.address)
       expect(endBalanceAddr1.toString()).to.equal(
-        startBalanceAddr1.add(price.mul(communityRoyaltyShare).div(10000)).toString()
+        startBalanceAddr1.add(value.mul(communityRoyaltyShare).div(basis)).toString()
       )
       expect(endBalanceAddr2.toString()).to.equal(
-        startBalanceAddr2.add(price.mul(BigNumber.from(10000).sub(communityRoyaltyShare)).div(10000)).toString()
+        startBalanceAddr2.add(value.mul(basis.sub(communityRoyaltyShare)).div(basis)).toString()
       )
+    })
+  
+    it('withdraw token', async function () {
+      const basis = BigNumber.from(10000)
+      const value = BigNumber.from('10').pow(18)
+      const communityRoyaltyShare = await AnimaVerseCollectionInstance.communityRoyaltyShare()
+
+      await AnimaVerseCollectionInstance.setCommunityWithdrawMainAccount(addr1.address)
+      await AnimaVerseCollectionInstance.setArtistsWithdrawAccount(addr2.address)
+
+      const AnimaVerseToken = await ethers.getContractFactory('AnimaverseToken')
+      const AnimaVerseTokenInstance = await AnimaVerseToken.deploy()
+
+      await AnimaVerseTokenInstance.mint(AnimaVerseCollectionInstance.address, value)
+      const contractBalance = await AnimaVerseTokenInstance.balanceOf(AnimaVerseCollectionInstance.address)
+      expect(contractBalance.toString()).to.equal(value.toString())
+
+      await AnimaVerseCollectionInstance.withdrawTokens(AnimaVerseTokenInstance.address, value)
+      const balanceAddr1 = await AnimaVerseTokenInstance.balanceOf(addr1.address)
+      const balanceAddr2 = await AnimaVerseTokenInstance.balanceOf(addr2.address)
+
+      expect(balanceAddr1.toString()).to.equal(value.mul(communityRoyaltyShare).div(basis).toString())
+      expect(balanceAddr2.toString()).to.equal(value.mul(basis.sub(communityRoyaltyShare)).div(basis).toString())
     })
   })
 })

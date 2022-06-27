@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.14;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/utils/Strings.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import '@openzeppelin/contracts/interfaces/IERC165.sol';
 import '@openzeppelin/contracts/interfaces/IERC2981.sol';
@@ -16,6 +16,7 @@ error WithdrawFailed();
 error BadRoyaltyInput();
 error InsufficientFunds();
 error AlreadyMintedRound();
+error ContractsNotAllowed();
 error BadMaxAddressMintInput();
 error BadRoundLastTokenInput();
 
@@ -86,8 +87,9 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         }
 
         if (newSupply > roundLastToken) revert NoTokensLeft();
-        if (newAddressMintedCount > maxAddressMint) revert NoTokensLeft();
+        if (msgSender != tx.origin) revert ContractsNotAllowed();
         if (quantity > maxAddressRoundMint) revert NoTokensLeft();
+        if (newAddressMintedCount > maxAddressMint) revert NoTokensLeft();
         if (lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
 
         if (mintPrice > 0) {
@@ -104,14 +106,14 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         lastAddressMintRound[msgSender] = roundLastToken;
         mintedCount[msgSender] = newAddressMintedCount;
         while (_totalSupply < newSupply) {
-            _safeMint(msgSender, _totalSupply);
+            _mint(msgSender, _totalSupply);
             unchecked {
                 ++_totalSupply;
             }
         }
     }
 
-    function setContractMetadata(string memory _contractMetadata) public onlyOwner {
+    function setContractMetadata(string calldata _contractMetadata) public onlyOwner {
         contractMetadata = _contractMetadata;
     }
 
@@ -131,7 +133,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         maxAddressRoundMint = _maxAddressRoundMint;
     }
 
-    function setBaseURI(string memory collectionURI) public onlyOwner {
+    function setBaseURI(string calldata collectionURI) public onlyOwner {
         baseURI = collectionURI;
     }
 

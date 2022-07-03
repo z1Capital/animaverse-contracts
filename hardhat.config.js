@@ -11,7 +11,7 @@ const etherscanApi = process.env.ETHSCAN_KEY ?? "";
 const infuraApi = process.env.INFURA_KEY ?? "";
 
 module.exports = {
-  defaultNetwork: "rinkeby",
+  defaultNetwork: "hardhat",
   networks: {
     localhost: {
       url: "http://127.0.0.1:8545"
@@ -34,7 +34,7 @@ module.exports = {
     }
   },
   solidity: {
-    version: "0.8.14",
+    version: "0.8.15",
     settings: {
       optimizer: {
         enabled: true,

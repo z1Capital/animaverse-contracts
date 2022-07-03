@@ -11,6 +11,7 @@ async function main() {
     'https://assets.animaversedao.com/metadata/',
   )
   const res = await animaVerseCollection.deployed()
+  await animaVerseCollection.mint(1, { value: 0 })
   console.log('AnimaVerse Collection deployed to:', animaVerseCollection.address)
   console.log('Gas Used:', res.deployTransaction.gasLimit.toString())
 }

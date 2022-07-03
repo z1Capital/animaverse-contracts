@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/utils/Strings.sol';
@@ -37,8 +37,8 @@ contract AnimaVerseMintGame is Ownable, ERC721 {
 
     function _beforeTokenTransfer(
         address from,
-        address to,
-        uint256 tokenId
+        address,
+        uint256
     ) internal override {
         require(from == address(0), 'AVMG: Transfer is not allowed');
     }

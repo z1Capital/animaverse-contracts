@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import '@openzeppelin/contracts/utils/Strings.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
@@ -7,20 +7,9 @@ import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import '@openzeppelin/contracts/interfaces/IERC165.sol';
 import '@openzeppelin/contracts/interfaces/IERC2981.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-error NotExists();
-error AlreadySet();
-error NoTokensLeft();
-error NotEnoughETH();
-error WithdrawFailed();
-error BadRoyaltyInput();
-error InsufficientFunds();
-error AlreadyMintedRound();
-error ContractsNotAllowed();
-error BadMaxAddressMintInput();
-error BadRoundLastTokenInput();
-
-contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
+contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981, ReentrancyGuard {
     using Strings for uint256;
 
     uint16 private constant BASE = 10000;
@@ -42,6 +31,18 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
 
     mapping(address => uint16) public lastAddressMintRound;
     mapping(address => uint16) public mintedCount;
+
+    error NotExists();
+    error AlreadySet();
+    error NoTokensLeft();
+    error Unauthorized();
+    error NotEnoughETH();
+    error WithdrawFailed();
+    error BadRoyaltyInput();
+    error InsufficientFunds();
+    error AlreadyMintedRound();
+    error BadMaxAddressMintInput();
+    error BadRoundLastTokenInput();
 
     constructor(string memory _contractMetadata, string memory collectionURI) ERC721('AnimaVerse Collection', 'AVC') {
         contractMetadata = _contractMetadata;
@@ -78,16 +79,17 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
 
     function mint(uint16 quantity) public payable {
         address msgSender = _msgSender();
+        uint16 currentSupply = _totalSupply;
         uint16 newSupply;
         uint16 newAddressMintedCount;
         uint256 totalPrice;
         unchecked {
-            newSupply = _totalSupply + quantity;
+            newSupply = currentSupply + quantity;
             newAddressMintedCount = mintedCount[msgSender] + quantity;
         }
 
+        if (msgSender != tx.origin) revert Unauthorized();
         if (newSupply > roundLastToken) revert NoTokensLeft();
-        if (msgSender != tx.origin) revert ContractsNotAllowed();
         if (quantity > maxAddressRoundMint) revert NoTokensLeft();
         if (newAddressMintedCount > maxAddressMint) revert NoTokensLeft();
         if (lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
@@ -99,18 +101,19 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         }
         if (msg.value < totalPrice) {
             revert NoTokensLeft();
-        } else if (msg.value > totalPrice) {
+        } else if (msg.value != totalPrice) {
             payable(msgSender).transfer(msg.value - totalPrice);
         }
 
         lastAddressMintRound[msgSender] = roundLastToken;
         mintedCount[msgSender] = newAddressMintedCount;
-        while (_totalSupply < newSupply) {
-            _mint(msgSender, _totalSupply);
+        while (currentSupply < newSupply) {
+            _mint(msgSender, currentSupply);
             unchecked {
-                ++_totalSupply;
+                ++currentSupply;
             }
         }
+        _totalSupply = currentSupply;
     }
 
     function setContractMetadata(string calldata _contractMetadata) public onlyOwner {
@@ -165,7 +168,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         artistsWithdrawAccount = account;
     }
 
-    function withdraw(uint256 _amount) public onlyOwner {
+    function withdraw(uint256 _amount) public onlyOwner nonReentrant {
         uint256 balance = address(this).balance;
         if (_amount > balance) {
             revert InsufficientFunds();
@@ -194,7 +197,7 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981 {
         emit ContractWithdraw(artistsWithdrawAccount, aShare);
     }
 
-    function withdrawTokens(address _tokenContract, uint256 _amount) public onlyOwner {
+    function withdrawTokens(address _tokenContract, uint256 _amount) public onlyOwner nonReentrant {
         IERC20 tokenContract = IERC20(_tokenContract);
         uint256 balance = tokenContract.balanceOf(address(this));
         if (_amount > balance) {

@@ -1,36 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import '@openzeppelin/contracts/utils/Strings.sol';
+import 'erc721a/contracts/ERC721A.sol';
+import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/interfaces/IERC20.sol';
 import '@openzeppelin/contracts/interfaces/IERC165.sol';
 import '@openzeppelin/contracts/interfaces/IERC2981.sol';
-import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 
-contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981, ReentrancyGuard {
-    using Strings for uint256;
-
+contract AnimaVerseCollection is Ownable, ERC721A, IERC2981, ReentrancyGuard {
     uint16 private constant BASE = 10000;
     uint16 private constant MAX_TOKENS = 10004;
-    uint16 private _totalSupply;
 
     string private baseURI;
-    string private contractMetadata;
+    string private _contractMetadata;
 
-    uint16 public royalty = 1000; // base 10000, 5%
-    uint16 public communityRoyaltyShare = 9850; // base 10000, 98.5%
-    uint16 public roundLastToken = 2501;
-    uint16 public maxAddressMint = 1;
-    uint16 public maxAddressRoundMint = 1;
-    uint256 public mintPrice;
+    uint16 private _royalty = 1000; // base 10000, 5%
+    uint16 private _communityRoyaltyShare = 9850; // base 10000, 98.5%
+    uint16 private _roundLastToken = 2501;
+    uint16 private _maxAddressMint = 1;
+    uint16 private _maxAddressRoundMint = 1;
+    uint256 private _mintPrice;
 
-    address public artistsWithdrawAccount;
-    address public communityWithdrawAccount;
+    address private _artistsWithdrawAccount;
+    address private _communityWithdrawAccount;
 
-    mapping(address => uint16) public lastAddressMintRound;
-    mapping(address => uint16) public mintedCount;
+    mapping(address => uint16) private _lastAddressMintRound;
+    mapping(address => uint16) private _mintedCount;
 
     error NotExists();
     error AlreadySet();
@@ -44,128 +41,131 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981, ReentrancyGuard 
     error BadMaxAddressMintInput();
     error BadRoundLastTokenInput();
 
-    constructor(string memory _contractMetadata, string memory collectionURI) ERC721('AnimaVerse Collection', 'AVC') {
-        contractMetadata = _contractMetadata;
+    constructor(string memory contractMetadata, string memory collectionURI) ERC721A('AnimaVerse Collection', 'AVC') {
+        _contractMetadata = contractMetadata;
         baseURI = collectionURI;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, IERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721A, IERC165) returns (bool) {
         return interfaceId == type(IERC2981).interfaceId || super.supportsInterface(interfaceId);
     }
 
-    function totalSupply() public view returns (uint256) {
-        return _totalSupply;
-    }
-
     function contractURI() public view returns (string memory) {
-        return contractMetadata;
+        return _contractMetadata;
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        if (!_exists(tokenId)) {
-            revert NotExists();
-        }
-        return string(abi.encodePacked(baseURI, tokenId.toString()));
+    function mintPrice() public view returns (uint256) {
+        return _mintPrice;
     }
 
-    function royaltyInfo(uint256, uint256 _salePrice)
+    function roundLastToken() public view returns (uint16) {
+        return _roundLastToken;
+    }
+
+    function maxAddressMint() public view returns (uint16) {
+        return _maxAddressMint;
+    }
+
+    function maxAddressRoundMint() public view returns (uint16) {
+        return _maxAddressRoundMint;
+    }
+
+    function mintedCount(address account) public view returns (uint16) {
+        return _mintedCount[account];
+    }
+
+    function lastAddressMintRound(address account) public view returns (uint16) {
+        return _lastAddressMintRound[account];
+    }
+
+    function royaltyInfo(uint256, uint256 salePrice)
         external
         view
         override
         returns (address receiver, uint256 royaltyAmount)
     {
-        return (address(this), (_salePrice * royalty) / BASE);
+        return (address(this), (salePrice * _royalty) / BASE);
     }
 
     function mint(uint16 quantity) public payable {
         address msgSender = _msgSender();
-        uint16 currentSupply = _totalSupply;
-        uint16 newSupply;
+        uint256 currentSupply = _nextTokenId();
+        uint16 roundLastToken = _roundLastToken;
+        uint256 newSupply;
         uint16 newAddressMintedCount;
         uint256 totalPrice;
         unchecked {
             newSupply = currentSupply + quantity;
-            newAddressMintedCount = mintedCount[msgSender] + quantity;
+            newAddressMintedCount = _mintedCount[msgSender] + quantity;
+            totalPrice = quantity * _mintPrice;
         }
 
         if (msgSender != tx.origin) revert Unauthorized();
         if (newSupply > roundLastToken) revert NoTokensLeft();
-        if (quantity > maxAddressRoundMint) revert NoTokensLeft();
-        if (newAddressMintedCount > maxAddressMint) revert NoTokensLeft();
-        if (lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
-
-        if (mintPrice > 0) {
-            unchecked {
-                totalPrice = quantity * mintPrice;
-            }
-        }
+        if (quantity > _maxAddressRoundMint) revert NoTokensLeft();
+        if (newAddressMintedCount > _maxAddressMint) revert NoTokensLeft();
+        if (_lastAddressMintRound[msgSender] == roundLastToken) revert AlreadyMintedRound();
         if (msg.value < totalPrice) {
             revert NoTokensLeft();
-        } else if (msg.value != totalPrice) {
+        } else if (msg.value > totalPrice) {
             payable(msgSender).transfer(msg.value - totalPrice);
         }
 
-        lastAddressMintRound[msgSender] = roundLastToken;
-        mintedCount[msgSender] = newAddressMintedCount;
-        while (currentSupply < newSupply) {
-            _mint(msgSender, currentSupply);
-            unchecked {
-                ++currentSupply;
-            }
-        }
-        _totalSupply = currentSupply;
+        _lastAddressMintRound[msgSender] = roundLastToken;
+        _mintedCount[msgSender] = newAddressMintedCount;
+        _mint(msgSender, quantity);
     }
 
-    function setContractMetadata(string calldata _contractMetadata) public onlyOwner {
-        contractMetadata = _contractMetadata;
+    function setContractMetadata(string calldata contractMetadata) public onlyOwner {
+        _contractMetadata = contractMetadata;
     }
 
     function setNewRound(
-        uint256 _price,
-        uint16 _roundLastToken,
-        uint16 _maxAddressMint,
-        uint16 _maxAddressRoundMint
+        uint256 price,
+        uint16 roundLastToken,
+        uint16 maxAddressMint,
+        uint16 maxAddressRoundMint
     ) public onlyOwner {
-        if (_roundLastToken > MAX_TOKENS) revert BadRoundLastTokenInput();
-        if (_roundLastToken < roundLastToken) revert BadRoundLastTokenInput();
-        if (_maxAddressMint < maxAddressMint) revert BadMaxAddressMintInput();
+        if (roundLastToken > MAX_TOKENS) revert BadRoundLastTokenInput();
+        if (roundLastToken < _roundLastToken) revert BadRoundLastTokenInput();
+        if (maxAddressMint < _maxAddressMint) revert BadMaxAddressMintInput();
 
-        mintPrice = _price;
-        roundLastToken = _roundLastToken;
-        maxAddressMint = _maxAddressMint;
-        maxAddressRoundMint = _maxAddressRoundMint;
+        _mintPrice = price;
+        _roundLastToken = roundLastToken;
+        _maxAddressMint = maxAddressMint;
+        _maxAddressRoundMint = maxAddressRoundMint;
     }
 
     function setBaseURI(string calldata collectionURI) public onlyOwner {
         baseURI = collectionURI;
     }
 
-    function setRoyalty(uint16 _royalty) public onlyOwner {
-        if (_royalty > 1000) {
+    function setRoyalty(uint16 royalty) public onlyOwner {
+        if (royalty > 1000) {
             revert BadRoyaltyInput();
         }
-        royalty = _royalty;
+        _royalty = royalty;
     }
 
-    function setCommunityRoyaltyShare(uint16 _communityRoyaltyShare) public onlyOwner {
-        if (_communityRoyaltyShare > 1000) {
+    function setCommunityRoyaltyShare(uint16 communityRoyaltyShare) public onlyOwner {
+        if (communityRoyaltyShare > 1000) {
             revert BadRoyaltyInput();
         }
-        communityRoyaltyShare = _communityRoyaltyShare;
+        _communityRoyaltyShare = communityRoyaltyShare;
     }
 
     function setCommunityWithdrawMainAccount(address account) public onlyOwner {
-        if (communityWithdrawAccount == account) {
+        if (_communityWithdrawAccount == account) {
             revert AlreadySet();
         }
-        communityWithdrawAccount = account;
+        _communityWithdrawAccount = account;
     }
 
     function setArtistsWithdrawAccount(address account) public onlyOwner {
-        if (artistsWithdrawAccount == account) {
+        if (_artistsWithdrawAccount == account) {
             revert AlreadySet();
         }
-        artistsWithdrawAccount = account;
+        _artistsWithdrawAccount = account;
     }
 
     function withdraw(uint256 _amount) public onlyOwner nonReentrant {
@@ -177,24 +177,24 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981, ReentrancyGuard 
         uint256 cShare;
         uint256 aShare;
         unchecked {
-            cShare = (_amount * communityRoyaltyShare) / BASE;
+            cShare = (_amount * _communityRoyaltyShare) / BASE;
             aShare = _amount - cShare;
         }
 
         bool communityWithdrawResult;
-        (communityWithdrawResult, ) = payable(communityWithdrawAccount).call{value: cShare}('');
+        (communityWithdrawResult, ) = payable(_communityWithdrawAccount).call{value: cShare}('');
         if (!communityWithdrawResult) {
             revert WithdrawFailed();
         }
 
         bool artistsWithdrawResult;
-        (artistsWithdrawResult, ) = payable(artistsWithdrawAccount).call{value: aShare}('');
+        (artistsWithdrawResult, ) = payable(_artistsWithdrawAccount).call{value: aShare}('');
         if (!artistsWithdrawResult) {
             revert WithdrawFailed();
         }
 
-        emit ContractWithdraw(communityWithdrawAccount, cShare);
-        emit ContractWithdraw(artistsWithdrawAccount, aShare);
+        emit ContractWithdraw(_communityWithdrawAccount, cShare);
+        emit ContractWithdraw(_artistsWithdrawAccount, aShare);
     }
 
     function withdrawTokens(address _tokenContract, uint256 _amount) public onlyOwner nonReentrant {
@@ -207,23 +207,19 @@ contract AnimaVerseCollectionTest is Ownable, ERC721, IERC2981, ReentrancyGuard 
         uint256 cShare;
         uint256 aShare;
         unchecked {
-            cShare = (_amount * communityRoyaltyShare) / BASE;
+            cShare = (_amount * _communityRoyaltyShare) / BASE;
             aShare = _amount - cShare;
         }
 
-        tokenContract.transfer(communityWithdrawAccount, cShare);
-        tokenContract.transfer(artistsWithdrawAccount, aShare);
+        tokenContract.transfer(_communityWithdrawAccount, cShare);
+        tokenContract.transfer(_artistsWithdrawAccount, aShare);
 
-        emit ContractWithdrawToken(communityWithdrawAccount, _tokenContract, cShare);
-        emit ContractWithdrawToken(artistsWithdrawAccount, _tokenContract, aShare);
+        emit ContractWithdrawToken(_communityWithdrawAccount, _tokenContract, cShare);
+        emit ContractWithdrawToken(_artistsWithdrawAccount, _tokenContract, aShare);
     }
 
     function _baseURI() internal view override returns (string memory) {
         return baseURI;
-    }
-
-    function _exists(uint256 tokenId) internal view override returns (bool) {
-        return tokenId < _totalSupply;
     }
 
     event ContractWithdraw(address indexed withdrawAddress, uint256 amount);
